@@ -1,0 +1,11 @@
+author: phoenix
+description: Phoenix V8 初心回归版插件 — 手动升档、三层兜底、ProviderResolver真切换。
+name: phoenix-full
+provides_hooks:
+- pre_gateway_dispatch
+- pre_api_request
+- post_api_request
+- on_session_start
+- on_session_finalize
+- on_session_reset
+version: 8.0.0

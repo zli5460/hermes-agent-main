@@ -1,6 +1,9 @@
 # Phoenix — Windows 一键安装脚本
 # 用法：解压发布包后，在 PowerShell 中执行：powershell -ExecutionPolicy Bypass -File .\install.ps1
 # 原则：自动化能自动化的一切；API Key只由用户现场输入，不内置、不回显、不写入日志。
+#
+# 画像 local-deepseek（Ollama + DeepSeek）：请在 WSL 或 Git Bash 中执行
+#   bash install.sh --profile=local-deepseek -y
 
 param(
     [switch]$Force

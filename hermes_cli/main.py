@@ -1469,6 +1469,18 @@ def cmd_chat(args):
     # Filter out None values
     kwargs = {k: v for k, v in kwargs.items() if v is not None}
 
+    # Phoenix V8 compatibility: some WSL/student Hermes installs carry an
+    # older cli.main() signature. Filter kwargs by the live callable signature
+    # before dispatching instead of crashing with unexpected keyword arguments
+    # such as 'verbose'.
+    try:
+        import inspect
+        sig = inspect.signature(cli_main)
+        if not any(p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()):
+            kwargs = {k: v for k, v in kwargs.items() if k in sig.parameters}
+    except Exception:
+        pass
+
     try:
         cli_main(**kwargs)
     except ValueError as e:

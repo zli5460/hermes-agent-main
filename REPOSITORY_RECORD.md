@@ -43,3 +43,11 @@ pip install pyyaml   # 若尚未安装
 python3 sim_verify_v8.py --no-zip
 # 打发布 zip + CHECKSUMS：python3 sim_verify_v8.py
 ```
+
+本地一键安装（Ollama 日常 + DeepSeek 高档）：
+
+```bash
+cd phoenix-v8-release
+export HERMES_AGENT_DIR=/你的/hermes-agent源码目录   # 可选，默认识别常见路径
+bash install.sh --profile=local-deepseek -y
+```

@@ -92,6 +92,10 @@ export HERMES_AGENT_DIR=/你的/hermes-agent路径
 - 同目录 **`CHECKSUMS.txt`**  
 - 文档：**`INSTALL_安装说明_完整版.md`**、**`RELEASE_交付流程与验收.md`**（本文）
 
+### 6.1 GitHub Releases（推荐）
+
+在仓库 **Releases** 新建版本（如 `phoenix-v8-8.0.x`），上传 **`phoenix-v8-release.zip`** 与 **`CHECKSUMS.txt`**，说明正文链到 **`CHANGELOG.md`** 与 **`PHOENIX_V8_CORE_DELIVERY.md`**。下载方可独立校验 zip 的 SHA256。
+
 ---
 
 ## 7. 一句话给老板

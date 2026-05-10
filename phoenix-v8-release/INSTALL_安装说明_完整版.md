@@ -37,6 +37,14 @@
 
 若只希望「保留 Key、换新版代码」：备份已含 `.env`，你也可以在覆盖安装前后自行再拷一份 `.env` 到外置盘。
 
+**画像 local-deepseek（本机 Ollama + DeepSeek 高档）**：免安装时逐项问答，在发布包目录执行：
+
+```bash
+bash install.sh --profile=local-deepseek -y
+```
+
+需 `.env` 中已配置 **`DEEPSEEK_API_KEY`**（及可选 **`DEEPSEEK_BASE_URL`**）；Ollama 默认 `http://127.0.0.1:11434/v1`。详见 **`PHOENIX_V8_CORE_DELIVERY.md`** §0.6。
+
 ### 1.2 全新机器怎么装？
 
 1. 按官方流程先装好 **Hermes**，终端里 **`hermes --help`** 能跑。

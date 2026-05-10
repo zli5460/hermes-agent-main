@@ -45,6 +45,25 @@
 
 本交付说明 §0 就是为减少这类混乱；**真要「正儿八经」**：安装验收里加一条 **`hermes --help` 正常 + `check_hermes_entrypoint` 绿**，再交付。
 
+### 0.5 密钥与隐私：**哪些东西不能外传**
+
+- **`~/.hermes/.env`**：所有 API Key 与端点密钥，**禁止**截图、粘贴到群聊、提交到 Git。  
+- **`~/.hermes/phoenix/config.json`**（尤其 `phoenix_open`）：含模型档位、provider 名与 **`api_key_env` 引用**，同样视为敏感配置。  
+- **安装器备份目录** `~/.hermes/backups/phoenix_preinstall_*`：可能含完整配置副本，外发前需脱敏或删除。  
+- 对外沟通问题现象时：只描述**现象与日志片段**，不要附带完整配置文件。
+
+### 0.6 安装画像 `local-deepseek`（Ollama + DeepSeek）
+
+适合：**日常对话走本机 Ollama**（OpenAI 兼容），**`/深度` `/大神` `/真神` 走 DeepSeek 云端**。
+
+```bash
+bash install.sh --profile=local-deepseek -y
+# 或 export PHOENIX_INSTALL_PROFILE=local-deepseek
+```
+
+可选环境变量：`PHOENIX_OLLAMA_BASE_URL`、`PHOENIX_OLLAMA_MODEL`、`PHOENIX_DEEPSEEK_MODEL`；`DEEPSEEK_BASE_URL` 优先读 `~/.hermes/.env`。  
+**Windows PowerShell** 若未装 Git Bash/WSL，请用 WSL 执行上述 `bash install.sh`。
+
 ---
 
 ## 1. 这一版到底要交付什么？

@@ -4,6 +4,11 @@
 
 ## [8.0.0] — 2026-05-10
 
+### 安装器
+
+- **`bash install.sh --profile=local-deepseek -y`**：Ollama 本地日常 + DeepSeek 高档口令，无需逐项问答；详见 `PHOENIX_V8_CORE_DELIVERY.md` §0.6。  
+- 辅助脚本 **`scripts/apply_profile_local_deepseek.py`**；`doctor` / 语法自检优先使用 Hermes 源码目录下 **`venv/bin/python3`**（若存在）。
+
 ### 命名与目录
 
 - 发行目录由 `phoenix-v5.1.3-release` 更名为 **`phoenix-v8-release`**；对外版本标识统一为 **Phoenix V8**（不死鸟）。

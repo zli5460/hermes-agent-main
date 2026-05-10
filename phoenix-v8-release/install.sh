@@ -6,6 +6,48 @@
 set -euo pipefail
 shopt -s extglob
 
+# 可选：PHOENIX_INSTALL_PROFILE=local-deepseek；命令行 --profile=local-deepseek；-y 跳过确认
+PHOENIX_INSTALL_PROFILE="${PHOENIX_INSTALL_PROFILE:-}"
+INSTALL_NONINTERACTIVE=0
+while [ "${1:-}" != "" ]; do
+  case "$1" in
+    --profile=*)
+      PHOENIX_INSTALL_PROFILE="${1#*=}"
+      shift
+      ;;
+    --profile)
+      PHOENIX_INSTALL_PROFILE="${2:-}"
+      shift 2
+      ;;
+    -y|--yes)
+      INSTALL_NONINTERACTIVE=1
+      shift
+      ;;
+    -h|--help)
+      cat <<'EOF'
+用法: bash install.sh [选项]
+
+  --profile=NAME   安装画像：local-deepseek（Ollama 本地日常 + DeepSeek /深度 /大神 /真神）
+                   也可用环境变量 PHOENIX_INSTALL_PROFILE=local-deepseek
+  -y, --yes        跳过「确认开始安装」交互（仍会执行 hermes 入口检查）
+
+画像 local-deepseek 可选环境变量：
+  PHOENIX_OLLAMA_BASE_URL   默认 http://127.0.0.1:11434/v1
+  PHOENIX_OLLAMA_MODEL      默认 qwen3.6:35b-a3b-q4_K_M
+  PHOENIX_DEEPSEEK_MODEL    默认 deepseek-chat
+  DEEPSEEK_BASE_URL         优先从 ~/.hermes/.env 读取，否则 https://api.deepseek.com/v1
+
+安装后若 doctor 报缺 Python 依赖，请使用 Hermes 源码目录下 venv 的 python 运行 doctor。
+EOF
+      exit 0
+      ;;
+    *)
+      echo "❌ 未知参数: $1（bash install.sh --help）"
+      exit 1
+      ;;
+  esac
+done
+
 OS="$(uname -s)"
 case "$OS" in
   Darwin) PLATFORM="macOS" ;;
@@ -65,6 +107,66 @@ detect_hermes_agent_dir() {
   done
   printf '%s' "$HERMES_HOME/hermes-agent"
   return 0
+}
+
+apply_profile_local_deepseek() {
+  local OLLAMA_URL="${PHOENIX_OLLAMA_BASE_URL:-http://127.0.0.1:11434/v1}"
+  local OLLAMA_MODEL="${PHOENIX_OLLAMA_MODEL:-qwen3.6:35b-a3b-q4_K_M}"
+  local DS_MODEL="${PHOENIX_DEEPSEEK_MODEL:-deepseek-chat}"
+  local LOCAL_P="local"
+  local DSURL="${PHOENIX_DEEPSEEK_BASE_URL:-}"
+  mkdir -p "$HERMES_HOME"
+  touch "$ENV_FILE"
+  if [ -z "$DSURL" ] && [ -f "$ENV_FILE" ]; then
+    DSURL="$(grep -E '^DEEPSEEK_BASE_URL=' "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'" || true)"
+  fi
+  DSURL="${DSURL:-https://api.deepseek.com/v1}"
+
+  if ! grep -q '^OLLAMA_API_KEY=' "$ENV_FILE" 2>/dev/null; then
+    {
+      echo ""
+      echo "# Phoenix install profile local-deepseek"
+      echo "OLLAMA_API_KEY=ollama"
+    } >> "$ENV_FILE"
+    echo "  ✅ 已写入 OLLAMA_API_KEY=ollama（本地 Ollama 占位）"
+  fi
+
+  set_config_yaml phoenix.router.daily_model "$OLLAMA_MODEL"
+  set_config_yaml phoenix.router.daily_provider "$LOCAL_P"
+  set_config_yaml phoenix.router.daily_base_url "$OLLAMA_URL"
+  set_config_yaml phoenix.router.daily_key_env OLLAMA_API_KEY
+  set_config_yaml phoenix.router.daily_fallback_model "$OLLAMA_MODEL"
+  set_config_yaml phoenix.router.daily_fallback_provider "$LOCAL_P"
+  set_config_yaml phoenix.router.daily_fallback_base_url "$OLLAMA_URL"
+  set_config_yaml phoenix.router.daily_fallback_key_env OLLAMA_API_KEY
+  set_config_yaml phoenix.router.deep_model "$DS_MODEL"
+  set_config_yaml phoenix.router.deep_fallback_model "$OLLAMA_MODEL"
+  set_config_yaml phoenix.router.god_model "$DS_MODEL"
+  set_config_yaml phoenix.router.god_fallback_model "$DS_MODEL"
+  set_config_yaml phoenix.router.super_god_primary "$DS_MODEL"
+  set_config_yaml phoenix.router.super_god_secondary "$DS_MODEL"
+  set_config_yaml phoenix.router.super_god_fallback_model "$DS_MODEL"
+  set_config_yaml phoenix.router.premium_base_url "$DSURL"
+  set_config_yaml phoenix.routing.high_tier_trigger manual_only
+  set_config_yaml phoenix.fallback.enabled true
+  set_config_yaml phoenix.fallback.on_status_codes '[401,402,403,429,500,502,503,504]'
+  set_config_yaml phoenix.fallback.on_errors '[timeout,connection_error,rate_limit,insufficient_quota]'
+  set_config_yaml phoenix.providers.daily.model "$OLLAMA_MODEL"
+  set_config_yaml phoenix.providers.daily.provider "$LOCAL_P"
+  set_config_yaml phoenix.providers.daily.base_url "$OLLAMA_URL"
+  set_config_yaml phoenix.providers.daily.key_env OLLAMA_API_KEY
+  set_config_yaml phoenix.providers.daily_fallback.model "$OLLAMA_MODEL"
+  set_config_yaml phoenix.providers.daily_fallback.provider "$LOCAL_P"
+  set_config_yaml phoenix.providers.daily_fallback.base_url "$OLLAMA_URL"
+  set_config_yaml phoenix.providers.daily_fallback.key_env OLLAMA_API_KEY
+
+  "$PHOENIX_PYTHON" "$PKG_DIR/scripts/apply_profile_local_deepseek.py" \
+    --config-json "$PHOENIX_HOME/config.json" \
+    --env-file "$ENV_FILE" \
+    --ollama-url "$OLLAMA_URL" \
+    --ollama-model "$OLLAMA_MODEL" \
+    --deepseek-model "$DS_MODEL"
+  echo "  ✅ phoenix_open 已写入（画像 local-deepseek）"
 }
 
 upsert_env() {
@@ -234,11 +336,22 @@ need_cmd python3
 
 HERMES_AGENT_DIR="$(detect_hermes_agent_dir)"
 BUNDLED_PLUGIN_DIR="$HERMES_AGENT_DIR/plugins/phoenix_full"
+if [ -x "$HERMES_AGENT_DIR/venv/bin/python3" ]; then
+  PHOENIX_PYTHON="$HERMES_AGENT_DIR/venv/bin/python3"
+elif [ -x "$HERMES_AGENT_DIR/.venv/bin/python3" ]; then
+  PHOENIX_PYTHON="$HERMES_AGENT_DIR/.venv/bin/python3"
+else
+  PHOENIX_PYTHON="${PHOENIX_PYTHON:-python3}"
+fi
 
 echo ""
 echo "========================================"
 echo "  Phoenix 一键安装程序"
 echo "  平台: $PLATFORM"
+if [ -n "$PHOENIX_INSTALL_PROFILE" ]; then
+  echo "  画像: $PHOENIX_INSTALL_PROFILE"
+fi
+echo "  Python（doctor/自检）: $PHOENIX_PYTHON"
 echo "========================================"
 echo ""
 echo "📘 如果你不知道现在该干什么："
@@ -260,8 +373,13 @@ echo "  ✅ 自动重启 Gateway 让配置生效"
 echo "  ❌ 不内置、不输出、不上传任何我们的 API Key"
 echo "  ❌ 不覆盖用户现有记忆/会话数据"
 echo ""
-read -r -p "确认开始安装？(y/N): " CONFIRM
-case "$CONFIRM" in [Yy]*) ;; *) echo "已取消"; exit 0 ;; esac
+if [ "$INSTALL_NONINTERACTIVE" = "1" ]; then
+  CONFIRM=y
+  echo "  （-y）已自动确认开始安装"
+else
+  read -r -p "确认开始安装？(y/N): " CONFIRM
+  case "$CONFIRM" in [Yy]*) ;; *) echo "已取消"; exit 0 ;; esac
+fi
 
 check_hermes_entrypoint "安装前入口检查"
 
@@ -276,7 +394,7 @@ echo "  ✅ 备份目录: $BACKUP_DIR"
 echo ""
 echo "📁 [2/7] 安装 Phoenix 文件..."
 mkdir -p "$PHOENIX_HOME"
-for item in core router executor memory self_heal integration security adapt sandbox workflow github desktop plugins config skills tests; do
+for item in core router executor memory self_heal integration security adapt sandbox workflow github desktop plugins config skills tests scripts; do
   [ -e "$PKG_DIR/$item" ] && rsync -a --delete --exclude='__pycache__' "$PKG_DIR/$item/" "$PHOENIX_HOME/$item/"
 done
 for f in phoenix.py __init__.py cli.py doctor.py config.json auto_save.py auto_fusion.py post_upgrade_hook.sh install.sh install.ps1 sim_verify_v8.py VERSION.md CHANGELOG.md CLAUDE.md README.md START_HERE.md DELIVERY_GUIDE.md INSTALL_GUIDE.md USER_GUIDE.md ARCHITECTURE.md phoenix.yaml; do
@@ -300,6 +418,7 @@ if [ -f "$PKG_DIR/feature_registry.json" ]; then
   cp -f "$PKG_DIR/feature_registry.json" "$PHOENIX_HOME/feature_registry.json"
 fi
 chmod +x "$PHOENIX_HOME/install.sh" "$PHOENIX_HOME/post_upgrade_hook.sh" 2>/dev/null || true
+chmod +x "$PHOENIX_HOME/scripts/"*.py 2>/dev/null || true
 echo "  ✅ Phoenix 文件安装完成"
 
 echo ""
@@ -371,12 +490,19 @@ set_config_yaml plugins.enabled '[phoenix-full,disk-cleanup]'
 echo "  ✅ 基础配置完成"
 
 echo ""
+if [ "$PHOENIX_INSTALL_PROFILE" = "local-deepseek" ]; then
+  echo "🤖 [6/7] 画像 local-deepseek（Ollama 本地日常 + DeepSeek /深度 /大神 /真神）"
+  echo "  ℹ️  请确保本机已配置 DEEPSEEK_API_KEY；Ollama 默认 ${PHOENIX_OLLAMA_BASE_URL:-http://127.0.0.1:11434/v1}"
+  apply_profile_local_deepseek
+else
 echo "🤖 [6/7] 引导配置模型与 Key"
 echo "说明：这里填的是用户自己的 Key。安装包没有内置任何开发者 Key。"
 echo ""
 
 echo "模型链路说明：primary 是默认入口；fallback 是欠费/超时/失败时的救场模型。"
 echo "本地模型也可以做 fallback，例如 Ollama/LM Studio/vLLM 的 OpenAI 兼容地址。"
+echo ""
+echo "  💡 一键画像可改用：bash install.sh --profile=local-deepseek -y"
 echo ""
 
 read -r -p "日常默认模型 primary [xiaomi/mimo-v2.5]: " DAILY_MODEL
@@ -497,9 +623,11 @@ cfg_path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + '\n', encod
 PY
 echo "  ✅ 模型映射已写入 config.yaml + config.json：daily不切 / medium不自动切 / 高档手动确认"
 
+fi
+
 echo ""
 echo "🧪 [7/7] 本地自检 + doctor 闭环..."
-python3 - <<PY
+"$PHOENIX_PYTHON" - <<PY
 from pathlib import Path
 import py_compile
 root = Path('$PHOENIX_HOME')
@@ -510,13 +638,13 @@ PY
 
 echo ""
 echo "🩺 [7.1/7] 运行 Phoenix Doctor 自动验收..."
-python3 "$PHOENIX_HOME/doctor.py" --fix --home "$HERMES_HOME" --phoenix-home "$PHOENIX_HOME" --hermes-agent-dir "$HERMES_AGENT_DIR"
+"$PHOENIX_PYTHON" "$PHOENIX_HOME/doctor.py" --fix --home "$HERMES_HOME" --phoenix-home "$PHOENIX_HOME" --hermes-agent-dir "$HERMES_AGENT_DIR"
 
 restart_gateway
 
 echo ""
 echo "🔁 [7.2/7] 复测 Phoenix Doctor..."
-python3 "$PHOENIX_HOME/doctor.py" --verify --home "$HERMES_HOME" --phoenix-home "$PHOENIX_HOME" --hermes-agent-dir "$HERMES_AGENT_DIR"
+"$PHOENIX_PYTHON" "$PHOENIX_HOME/doctor.py" --verify --home "$HERMES_HOME" --phoenix-home "$PHOENIX_HOME" --hermes-agent-dir "$HERMES_AGENT_DIR"
 
 check_hermes_entrypoint "安装后入口复检"
 

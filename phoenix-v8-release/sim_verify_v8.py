@@ -67,6 +67,7 @@ REQUIRED_TOP_LEVEL = (
     "CHANGELOG.md",
     "plugins/phoenix_full/__init__.py",
     "plugins/phoenix_full/plugin.yaml",
+    "scripts/apply_profile_local_deepseek.py",
     "不死鸟_Phoenix_V8_使用说明书.md",
     "不死鸟_Phoenix_V8_技术细则与路径原理.md",
 )
@@ -75,6 +76,7 @@ INSTALL_MARKERS = (
     "不死鸟_Phoenix_V8_使用说明书.md",
     "Phoenix V8 compatibility",
     "CHANGELOG.md",
+    "local-deepseek",
 )
 
 SECRET_PATTERNS_PY_JSON = (
