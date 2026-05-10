@@ -279,7 +279,7 @@ mkdir -p "$PHOENIX_HOME"
 for item in core router executor memory self_heal integration security adapt sandbox workflow github desktop plugins config skills tests; do
   [ -e "$PKG_DIR/$item" ] && rsync -a --delete --exclude='__pycache__' "$PKG_DIR/$item/" "$PHOENIX_HOME/$item/"
 done
-for f in phoenix.py __init__.py cli.py doctor.py config.json auto_save.py auto_fusion.py post_upgrade_hook.sh install.sh install.ps1 VERSION.md CHANGELOG.md CLAUDE.md README.md START_HERE.md DELIVERY_GUIDE.md INSTALL_GUIDE.md USER_GUIDE.md ARCHITECTURE.md phoenix.yaml; do
+for f in phoenix.py __init__.py cli.py doctor.py config.json auto_save.py auto_fusion.py post_upgrade_hook.sh install.sh install.ps1 sim_verify_v8.py VERSION.md CHANGELOG.md CLAUDE.md README.md START_HERE.md DELIVERY_GUIDE.md INSTALL_GUIDE.md USER_GUIDE.md ARCHITECTURE.md phoenix.yaml; do
   [ -f "$PKG_DIR/$f" ] && cp -f "$PKG_DIR/$f" "$PHOENIX_HOME/$f"
 done
 for f in \

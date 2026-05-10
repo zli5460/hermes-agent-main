@@ -20,4 +20,5 @@
 ## 相关文件
 
 - 变更明细：`CHANGELOG.md`
+- 交付前静态验收：`python3 sim_verify_v8.py`（CI 使用 `--no-zip`）
 - 仓库级记录（根目录）：`REPOSITORY_RECORD.md`

@@ -273,7 +273,7 @@ foreach ($d in $dirs) {
 }
 $files = @(
     "phoenix.py","__init__.py","cli.py","doctor.py","config.json","auto_save.py","auto_fusion.py","post_upgrade_hook.sh","install.sh","install.ps1",
-    "VERSION.md","CHANGELOG.md","CLAUDE.md","README.md","START_HERE.md","DELIVERY_GUIDE.md","INSTALL_GUIDE.md","USER_GUIDE.md","ARCHITECTURE.md","phoenix.yaml",
+    "sim_verify_v8.py","VERSION.md","CHANGELOG.md","CLAUDE.md","README.md","START_HERE.md","DELIVERY_GUIDE.md","INSTALL_GUIDE.md","USER_GUIDE.md","ARCHITECTURE.md","phoenix.yaml",
     "不死鸟_Phoenix_V8_使用说明书.md","不死鸟_Phoenix_V8_技术细则与路径原理.md",
     "INSTALL_安装说明_完整版.md","INSTALL_平台选择_macOS_Windows_WSL_Linux.md","INSTALL_CUSTOMER_一页纸.md","INSTALL_装前装后对比_Hermes与不死鸟.md",
     "RELEASE_交付流程与验收.md","HERMES_融合与随版本升级.md","HERMES_TUI_与不死鸟斜杠指令.md","PHOENIX_V8_CORE_DELIVERY.md","Phoenix_V8_初心回归_架构蓝图.md"

@@ -8,7 +8,7 @@
 
 | 状态 | 说明 |
 |------|------|
-| **核心逻辑 / install / doctor / 插件** | 已在 **`phoenix_v8_manual_release/`** 内；发布前跑 **`python3 sim_verify_v8.py`** 生成 zip + `CHECKSUMS.txt`。 |
+| **核心逻辑 / install / doctor / 插件** | 已在仓库 **`phoenix-v8-release/`** 内；发布前于该目录执行 **`python3 sim_verify_v8.py`** 生成 zip + `CHECKSUMS.txt`（仅验证加 **`--no-zip`**）。 |
 | **本次补齐** | **流程文档**（本文）+ **装后自检脚本**（`scripts/post_install_smoke.sh`）+ **多环境手工验收表**（见下）。 |
 | **若要改产品逻辑** | 另立需求（例如 Web 安装向导、自动同步 `model.default`）；不在「交付_closure」里静默改路由行为。 |
 

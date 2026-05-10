@@ -5,10 +5,12 @@ on:
   push:
     paths:
       - "phoenix-v8-release/**"
+      - "REPOSITORY_RECORD.md"
       - ".github/workflows/phoenix-v8-tests.yml"
   pull_request:
     paths:
       - "phoenix-v8-release/**"
+      - "REPOSITORY_RECORD.md"
       - ".github/workflows/phoenix-v8-tests.yml"
 
 jobs:
@@ -21,6 +23,9 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Install Python deps
+        run: pip install --quiet pyyaml
+
       - name: Compile Python (syntax)
         run: python3 -m compileall -q phoenix-v8-release
 
@@ -30,6 +35,7 @@ jobs:
           python3 -c "import json; json.load(open('phoenix-v8-release/feature_registry.json'))"
 
       - name: Validate plugin manifest YAML
-        run: |
-          pip install --quiet pyyaml
-          python3 -c "import yaml; yaml.safe_load(open('phoenix-v8-release/plugins/phoenix_full/plugin.yaml'))"
+        run: python3 -c "import yaml; yaml.safe_load(open('phoenix-v8-release/plugins/phoenix_full/plugin.yaml'))"
+
+      - name: sim_verify_v8 (isolated doctor + static checks)
+        run: python3 phoenix-v8-release/sim_verify_v8.py --no-zip

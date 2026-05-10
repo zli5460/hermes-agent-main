@@ -13,7 +13,7 @@
 ### 文档
 
 - 使用说明书中「记忆目录」表述与 **`~/.hermes/phoenix`（`$PHOENIX_HOME`）** 对齐，避免与 `~/phoenix` 混淆。
-- 发布/验收文档中的 `sim_verify_v513.py`、`phoenix_v513_*` 等标识更新为 **`sim_verify_v8.py`**、**`phoenix_v8_*`**（若仓库内尚未包含验证脚本，以实际交付包为准）。
+- 仓库内提供 **`sim_verify_v8.py`**：包完整性、敏感信息粗扫、install 标记、插件口令、`doctor.py --verify` 隔离跑通；可选生成 **`phoenix-v8-release.zip`** 与 **`CHECKSUMS.txt`**。
 
 ### 兼容基线
 

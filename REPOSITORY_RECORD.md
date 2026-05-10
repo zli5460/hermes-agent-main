@@ -34,3 +34,12 @@ git branch -vv
 Phoenix 本身是私有交付项目，不依赖公开 GitHub 仓库地址。
 Hermes Agent 底层框架来自 NousResearch，Phoenix 是在 Hermes 之上的插件层。
 Phoenix 变更见 `phoenix-v8-release/CHANGELOG.md` 与 `phoenix-v8-release/VERSION.md`。
+
+交付前静态验收（本仓库已包含）：
+
+```bash
+cd phoenix-v8-release
+pip install pyyaml   # 若尚未安装
+python3 sim_verify_v8.py --no-zip
+# 打发布 zip + CHECKSUMS：python3 sim_verify_v8.py
+```
