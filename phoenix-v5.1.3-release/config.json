@@ -1,0 +1,525 @@
+{
+  "version": "5.1.3",
+  "router": {
+    "enabled": true,
+    "_model_matrix": {
+      "mimo-v2-flash": "输入$0.09  输出$0.29  — 路由判断（最便宜）",
+      "mimo-v2.5": "输入$0.40  输出$2.00  — 日常对话主力",
+      "mimo-v2.5-pro": "输入$0.40  输出$2.00  — 小代码/自动化",
+      "gemini-2.0-flash": "输入$0.10  输出$0.10  — 翻译/总结（极便宜）",
+      "haiku-4.5": "输入$0.25  输出$1.25  — 文案/选题",
+      "gpt-5.4-mini": "输入$0.75  输出$4.50  — 中等代码/英文",
+      "claude-sonnet-4.6": "输入$3.00  输出$15.00 — 深度策划（需确认）",
+      "claude-opus-4.7": "输入$5.00  输出$25.00 — 大神模式（必须确认）",
+      "gpt-5.5": "输入$5.00  输出$30.00 — 真神模式（必须确认）"
+    },
+    "task_modes": {
+      "daily": {
+        "description": "日常模式（40%，自动执行）",
+        "auto_execute": false,
+        "cost_threshold": 0.01,
+        "models": {
+          "chat": {
+            "primary": "xiaomi/mimo-v2.5",
+            "fallback": "xiaomi/mimo-v2-flash",
+            "provider": "nous-api"
+          },
+          "translation": {
+            "primary": "google/gemini-2.0-flash",
+            "fallback": "xiaomi/mimo-v2.5",
+            "provider": "google"
+          }
+        }
+      },
+      "medium": {
+        "description": "中等模式（40%，自动执行）",
+        "auto_execute": false,
+        "cost_threshold": 0.05,
+        "models": {
+          "code_small": {
+            "primary": "xiaomi/mimo-v2.5-pro",
+            "fallback": "xiaomi/mimo-v2.5",
+            "provider": "nous-api"
+          },
+          "content": {
+            "primary": "anthropic/claude-haiku-4.5",
+            "fallback": "google/gemini-2.0-flash",
+            "provider": "anthropic"
+          },
+          "code_medium": {
+            "primary": "xiaomi/mimo-v2.5",
+            "fallback": "xiaomi/mimo-v2.5-pro",
+            "provider": "openai"
+          }
+        }
+      },
+      "deep": {
+        "description": "深度模式（15%，需要确认）",
+        "auto_execute": false,
+        "requires_approval": true,
+        "cost_threshold": 1.0,
+        "models": {
+          "primary": "anthropic/claude-sonnet-4.6",
+          "fallback": "xiaomi/mimo-v2.5",
+          "provider": "anthropic"
+        }
+      },
+      "god": {
+        "description": "大神模式（4%，必须确认）",
+        "auto_execute": false,
+        "requires_approval": true,
+        "cost_threshold": 5.0,
+        "models": {
+          "primary": "anthropic/claude-opus-4.7",
+          "fallback": "anthropic/claude-sonnet-4.6",
+          "provider": "anthropic"
+        }
+      },
+      "super_god": {
+        "description": "真神模式（1%，必须确认）",
+        "auto_execute": false,
+        "requires_approval": true,
+        "cost_threshold": 10.0,
+        "models": {
+          "primary": "anthropic/claude-opus-4.7",
+          "secondary": "openai/gpt-5.5",
+          "fallback": "anthropic/claude-sonnet-4.6",
+          "provider": "anthropic"
+        }
+      }
+    },
+    "models": {
+      "routing": {
+        "primary": "xiaomi/mimo-v2-flash",
+        "fallback": "xiaomi/mimo-v2.5",
+        "emergency": "xiaomi/mimo-v2.5",
+        "provider": "nous-api"
+      },
+      "chat": {
+        "primary": "xiaomi/mimo-v2.5",
+        "fallback": "xiaomi/mimo-v2.5",
+        "emergency": "xiaomi/mimo-v2-flash",
+        "provider": "nous-api"
+      },
+      "code_small": {
+        "primary": "xiaomi/mimo-v2.5-pro",
+        "fallback": "xiaomi/mimo-v2.5",
+        "emergency": "xiaomi/mimo-v2.5",
+        "provider": "nous-api"
+      },
+      "code_medium": {
+        "primary": "xiaomi/mimo-v2.5",
+        "fallback": "anthropic/claude-haiku-4.5",
+        "emergency": "xiaomi/mimo-v2.5-pro",
+        "provider": "openai"
+      },
+      "code_large": {
+        "primary": "anthropic/claude-sonnet-4.6",
+        "fallback": "xiaomi/mimo-v2.5",
+        "emergency": "anthropic/claude-haiku-4.5",
+        "provider": "anthropic"
+      },
+      "reasoning_light": {
+        "primary": "xiaomi/mimo-v2.5",
+        "fallback": "xiaomi/mimo-v2.5",
+        "emergency": "anthropic/claude-haiku-4.5",
+        "provider": "nous-api"
+      },
+      "reasoning": {
+        "primary": "anthropic/claude-opus-4.7",
+        "fallback": "anthropic/claude-sonnet-4.6",
+        "emergency": "openai/gpt-5.5",
+        "provider": "anthropic"
+      },
+      "subtask": {
+        "primary": "xiaomi/mimo-v2.5",
+        "fallback": "xiaomi/mimo-v2.5",
+        "emergency": "xiaomi/mimo-v2-flash",
+        "provider": "openai"
+      },
+      "vision": {
+        "primary": "xiaomi/mimo-v2-omni",
+        "fallback": "google/gemini-3-flash-preview",
+        "emergency": "anthropic/claude-sonnet-4.6",
+        "provider": "nous-api"
+      }
+    },
+    "task_type_mapping": {
+      "chat": "chat",
+      "tool_call": "chat",
+      "memory_op": "chat",
+      "code": "code_medium",
+      "code_small": "code_small",
+      "code_medium": "code_medium",
+      "code_large": "code_large",
+      "reasoning": "reasoning",
+      "reasoning_light": "reasoning_light",
+      "delegation": "subtask",
+      "self_heal": "reasoning",
+      "evolution": "reasoning",
+      "routing": "routing",
+      "vision": "vision",
+      "compression": "chat"
+    },
+    "primary_model": {
+      "provider": "xiaomi",
+      "model": "xiaomi/mimo-v2.5",
+      "api_key": "$PHOENIX_FALLBACK_KEY",
+      "base_url": "https://token-plan-cn.xiaomimimo.com/v1",
+      "description": "小米MiMo官方API，三方欠费时兜底"
+    }
+  },
+  "memory": {
+    "enabled": true,
+    "auto_extract": true,
+    "session_max_entries": 200,
+    "cron_sync_enabled": true,
+    "recovery_enabled": true,
+    "compression": {
+      "enabled": true,
+      "keep_recent": 3,
+      "auto_compress_threshold": 6
+    },
+    "persistence": {
+      "user_profile": "~/.hermes/phoenix/memory/user_profile.json",
+      "projects": "~/.hermes/phoenix/memory/projects.json",
+      "conversations": "~/.hermes/phoenix/memory/conversations/"
+    }
+  },
+  "context": {
+    "pruning": {
+      "enabled": true,
+      "mode": "cache-ttl",
+      "ttl": "55m",
+      "maxMessages": 6
+    },
+    "caching": {
+      "enabled": true,
+      "retention": "long"
+    },
+    "heartbeat": {
+      "enabled": true,
+      "interval": "55m",
+      "model": "xiaomi/mimo-v2.5"
+    }
+  },
+  "executor": {
+    "micro_compact": {
+      "enabled": true,
+      "threshold_chars": 500
+    },
+    "deep_compact": {
+      "enabled": true,
+      "context_limit_ratio": 0.8
+    },
+    "budget": {
+      "monthly_limit_usd": 100,
+      "daily_limit_usd": 3.3,
+      "per_call_limit_usd": 5,
+      "auto_downgrade": true,
+      "downgrade_threshold": 0.8
+    },
+    "circuit_breaker": {
+      "failure_threshold": 3,
+      "cooldown_seconds": 60
+    },
+    "concurrency": {
+      "maxConcurrent": 2,
+      "subagents": {
+        "maxConcurrent": 4
+      }
+    }
+  },
+  "cost_monitor": {
+    "enabled": true,
+    "daily_limit": 3.3,
+    "monthly_limit": 100.0,
+    "alert_threshold": 0.8,
+    "auto_downgrade": true
+  },
+  "security": {
+    "api_key_blocking": true,
+    "daily_message_limit": 50,
+    "redact_secrets": false,
+    "redact_secrets_note": "V5.1改为默认关闭，防误伤普通文本"
+  },
+  "self_heal": {
+    "antibody_enabled": true,
+    "auto_fallback": true,
+    "evolution_enabled": true
+  },
+  "credit_monitor": {
+    "enabled": true,
+    "check_interval": 300,
+    "notify_on_exhaustion": true,
+    "auto_fallback_to_primary": true,
+    "auto_recover_on_topup": true
+  },
+  "display": {
+    "tui_optimization": {
+      "lazy_load_skills": true,
+      "deferred_tools": true,
+      "cache_model_info": true
+    }
+  },
+  "providers": {
+    "lmstudio": {
+      "enabled": true,
+      "base_url": "http://localhost:1234/v1",
+      "description": "LM Studio本地模型",
+      "models": [
+        "local-model"
+      ]
+    },
+    "gmi_cloud": {
+      "enabled": false,
+      "description": "GMI Cloud推理服务",
+      "note": "需配置API Key后启用"
+    },
+    "azure_ai": {
+      "enabled": false,
+      "description": "Azure AI推理服务",
+      "note": "需配置Endpoint+Key后启用"
+    },
+    "minimax": {
+      "enabled": false,
+      "description": "MiniMax OAuth认证",
+      "note": "需配置OAuth后启用"
+    },
+    "tencent_hub": {
+      "enabled": false,
+      "description": "腾讯Token Hub",
+      "note": "需配置Token后启用"
+    }
+  },
+  "skills": {
+    "comfyui": {
+      "enabled": false,
+      "description": "ComfyUI V5图片/视频/音频生成",
+      "note": "需安装comfy-cli后启用",
+      "install_command": "pip install comfy-cli"
+    }
+  },
+  "mcp": {
+    "touchdesigner": {
+      "enabled": false,
+      "description": "TouchDesigner实时视觉/音频交互",
+      "note": "需安装TouchDesigner后启用",
+      "transport": "stdio"
+    }
+  },
+  "platforms": {
+    "yuanbao": {
+      "enabled": false,
+      "description": "腾讯元宝AI原生消息平台",
+      "note": "第18个消息平台，需配置后启用",
+      "gateway": "hermes-yuanbao"
+    }
+  },
+  "phoenix_open": {
+    "version": "5.1.3",
+    "description": "Phoenix V5.1.3 初心回归版 — 手动升档 + 每档三层兜底 + ProviderResolver完整绑定",
+    "model_tiers": {
+      "daily": {
+        "name": "🟢 日常",
+        "description": "默认入口；不自动升档；primary失败才走fallback/emergency",
+        "auto_execute": false,
+        "requires_approval": false,
+        "model": "xiaomi/mimo-v2.5",
+        "provider": "xiaomi",
+        "base_url": "https://inference-api.nousresearch.com/v1",
+        "api_key_env": "NOUS_API_KEY",
+        "fallback": {
+          "model": "xiaomi/mimo-v2-flash",
+          "provider": "xiaomi"
+        },
+        "is_local": false,
+        "trigger": null,
+        "enabled": true,
+        "manual_only": false,
+        "emergency": {
+          "model": "xiaomi/mimo-v2.5",
+          "provider": "xiaomi"
+        },
+        "api_mode": "chat_completions"
+      },
+      "medium": {
+        "name": "🟡 中等",
+        "description": "预留档；V5.1.3默认不自动触发，可由客户后续开启 /中等",
+        "auto_execute": false,
+        "requires_approval": true,
+        "model": "xiaomi/mimo-v2.5-pro",
+        "provider": "xiaomi",
+        "base_url": "https://inference-api.nousresearch.com/v1",
+        "api_key_env": "NOUS_API_KEY",
+        "fallback": {
+          "model": "xiaomi/mimo-v2.5",
+          "provider": "xiaomi"
+        },
+        "is_local": false,
+        "trigger": "/中等",
+        "enabled": false,
+        "manual_only": true,
+        "emergency": {
+          "model": "xiaomi/mimo-v2-flash",
+          "provider": "xiaomi"
+        },
+        "api_mode": "chat_completions"
+      },
+      "deep": {
+        "name": "🟠 深度",
+        "description": "手动 /深度；确认后执行；失败走fallback/emergency",
+        "auto_execute": false,
+        "requires_approval": true,
+        "model": "anthropic/claude-sonnet-4.6",
+        "provider": "anthropic",
+        "base_url": "https://inference-api.nousresearch.com/v1",
+        "api_key_env": "ANTHROPIC_API_KEY",
+        "fallback": {
+          "model": "xiaomi/mimo-v2.5",
+          "provider": "xiaomi"
+        },
+        "is_local": false,
+        "trigger": "/深度",
+        "enabled": true,
+        "manual_only": true,
+        "emergency": {
+          "model": "xiaomi/mimo-v2-flash",
+          "provider": "xiaomi"
+        },
+        "api_mode": "chat_completions"
+      },
+      "god": {
+        "name": "🔴 大神",
+        "description": "手动 /大神；确认后执行；失败走fallback/emergency",
+        "auto_execute": false,
+        "requires_approval": true,
+        "model": "anthropic/claude-opus-4.7",
+        "provider": "anthropic",
+        "base_url": "https://inference-api.nousresearch.com/v1",
+        "api_key_env": "ANTHROPIC_API_KEY",
+        "fallback": {
+          "model": "anthropic/claude-sonnet-4.6",
+          "provider": "anthropic"
+        },
+        "is_local": false,
+        "trigger": "/大神",
+        "enabled": true,
+        "manual_only": true,
+        "emergency": {
+          "model": "xiaomi/mimo-v2.5",
+          "provider": "xiaomi"
+        },
+        "api_mode": "chat_completions"
+      },
+      "super_god": {
+        "name": "👑 真神",
+        "description": "手动 /真神；第一版以primary执行，secondary预留；失败走fallback/emergency",
+        "auto_execute": false,
+        "requires_approval": true,
+        "model_a": "anthropic/claude-opus-4.7",
+        "provider_a": "anthropic",
+        "base_url_a": "https://inference-api.nousresearch.com/v1",
+        "api_key_env_a": "ANTHROPIC_API_KEY",
+        "model_b": "openai/gpt-5.5",
+        "provider_b": "openai",
+        "base_url_b": "https://api.openai.com/v1",
+        "api_key_env_b": "OPENAI_API_KEY",
+        "model": "anthropic/claude-opus-4.7",
+        "provider": "anthropic",
+        "base_url": "https://inference-api.nousresearch.com/v1",
+        "api_key_env": "ANTHROPIC_API_KEY",
+        "fallback": {
+          "model": "anthropic/claude-sonnet-4.6",
+          "provider": "anthropic"
+        },
+        "is_local": false,
+        "trigger": "/真神",
+        "enabled": true,
+        "manual_only": true,
+        "emergency": {
+          "model": "xiaomi/mimo-v2.5",
+          "provider": "xiaomi"
+        },
+        "api_mode": "chat_completions"
+      }
+    },
+    "fallback": {
+      "model": "xiaomi/mimo-v2.5",
+      "provider": "xiaomi",
+      "base_url": "https://inference-api.nousresearch.com/v1",
+      "api_key_env": "NOUS_API_KEY",
+      "is_local": false
+    },
+    "providers": {
+      "xiaomi": {
+        "name": "Xiaomi MiMo / Nous-compatible",
+        "base_url": "https://inference-api.nousresearch.com/v1",
+        "api_key_env": "NOUS_API_KEY",
+        "models": [
+          "xiaomi/mimo-v2.5",
+          "xiaomi/mimo-v2.5-pro",
+          "xiaomi/mimo-v2-flash",
+          "mimo-v2.5",
+          "mimo-v2.5-pro",
+          "mimo-v2-flash"
+        ]
+      },
+      "anthropic": {
+        "name": "Anthropic / compatible endpoint",
+        "base_url": "https://inference-api.nousresearch.com/v1",
+        "api_key_env": "ANTHROPIC_API_KEY",
+        "models": [
+          "anthropic/claude-sonnet-4.6",
+          "anthropic/claude-opus-4.7",
+          "claude-sonnet-4.6",
+          "claude-opus-4.7"
+        ]
+      },
+      "openai": {
+        "name": "OpenAI / compatible endpoint",
+        "base_url": "https://api.openai.com/v1",
+        "api_key_env": "OPENAI_API_KEY",
+        "models": [
+          "openai/gpt-5.5",
+          "gpt-5.5",
+          "gpt-4o-mini",
+          "gpt-4o"
+        ]
+      },
+      "lmstudio": {
+        "name": "LM Studio (local)",
+        "base_url": "http://localhost:1234/v1",
+        "api_key": "lm-studio",
+        "is_local": true,
+        "models": []
+      },
+      "ollama": {
+        "name": "Ollama (local OpenAI-compatible)",
+        "base_url": "http://localhost:11434/v1",
+        "api_key": "ollama",
+        "is_local": true,
+        "models": []
+      },
+      "vllm": {
+        "name": "vLLM (local/OpenAI-compatible)",
+        "base_url": "http://localhost:8000/v1",
+        "api_key": "vllm",
+        "is_local": true,
+        "models": []
+      }
+    },
+    "manual_triggers": {
+      "deep": "/深度",
+      "god": "/大神",
+      "super_god": "/真神"
+    },
+    "routing_policy": {
+      "mode": "manual_upgrade_auto_fallback",
+      "auto_escalation": false,
+      "keyword_escalation": false,
+      "hook_model_override": false,
+      "api_mode": "chat_completions"
+    }
+  }
+}
