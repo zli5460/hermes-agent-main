@@ -12,6 +12,8 @@
   <a href="README.zh-CN.md"><img src="https://img.shields.io/badge/Lang-中文-red?style=for-the-badge" alt="中文"></a>
 </p>
 
+> **This repository copy (Hermes X Phoenix):** Maintained by [@zli5460](https://github.com/zli5460) at [hermes-agent-X-Phoenix-Architecture](https://github.com/zli5460/hermes-agent-X-Phoenix-Architecture). Includes the **Phoenix V5.1.3** add-on under [`phoenix-v5.1.3-release/`](phoenix-v5.1.3-release/); see [`REPOSITORY_RECORD.md`](REPOSITORY_RECORD.md). Upstream Hermes is from [NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent).
+
 **The self-improving AI agent built by [Nous Research](https://nousresearch.com).** It's the only agent with a built-in learning loop — it creates skills from experience, improves them during use, nudges itself to persist knowledge, searches its own past conversations, and builds a deepening model of who you are across sessions. Run it on a $5 VPS, a GPU cluster, or serverless infrastructure that costs nearly nothing when idle. It's not tied to your laptop — talk to it from Telegram while it works on a cloud VM.
 
 Use any model you want — [Nous Portal](https://portal.nousresearch.com), [OpenRouter](https://openrouter.ai) (200+ models), [NVIDIA NIM](https://build.nvidia.com) (Nemotron), [Xiaomi MiMo](https://platform.xiaomimimo.com), [z.ai/GLM](https://z.ai), [Kimi/Moonshot](https://platform.moonshot.ai), [MiniMax](https://www.minimax.io), [Hugging Face](https://huggingface.co), OpenAI, or your own endpoint. Switch with `hermes model` — no code changes, no lock-in.
