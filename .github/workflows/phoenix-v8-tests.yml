@@ -1,0 +1,35 @@
+# Static checks for the Phoenix V8 drop-in bundle (no full Hermes venv required).
+name: Phoenix V8 bundle checks
+
+on:
+  push:
+    paths:
+      - "phoenix-v8-release/**"
+      - ".github/workflows/phoenix-v8-tests.yml"
+  pull_request:
+    paths:
+      - "phoenix-v8-release/**"
+      - ".github/workflows/phoenix-v8-tests.yml"
+
+jobs:
+  static:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compile Python (syntax)
+        run: python3 -m compileall -q phoenix-v8-release
+
+      - name: Validate JSON configs
+        run: |
+          python3 -c "import json; json.load(open('phoenix-v8-release/config.json'))"
+          python3 -c "import json; json.load(open('phoenix-v8-release/feature_registry.json'))"
+
+      - name: Validate plugin manifest YAML
+        run: |
+          pip install --quiet pyyaml
+          python3 -c "import yaml; yaml.safe_load(open('phoenix-v8-release/plugins/phoenix_full/plugin.yaml'))"

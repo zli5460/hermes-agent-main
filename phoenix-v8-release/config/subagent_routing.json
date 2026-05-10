@@ -1,0 +1,80 @@
+{
+  "_comment": "Phoenix V8 路由配置 — 两条路同时打通",
+  "models": {
+    "xiaomi/mimo-v2.5": {
+      "provider": "nous-api",
+      "cost": "low",
+      "strength": "chinese",
+      "role": "默认模型"
+    },
+    "anthropic/claude-sonnet-4.6": {
+      "provider": "nous-api",
+      "cost": "medium",
+      "strength": "code",
+      "role": "中等代码（API调用）"
+    },
+    "anthropic/claude-opus-4.7": {
+      "provider": "nous-api",
+      "cost": "high",
+      "strength": "reasoning",
+      "role": "复杂代码/深度推理（API调用）"
+    }
+  },
+  "executors": {
+    "nous_api": {
+      "description": "Nous Portal API — 纯文本任务，快",
+      "use_when": ["纯推理", "分析", "汇总", "翻译", "简单代码"],
+      "entry": "phoenix.executor.claude_executor"
+    },
+    "claude_code_cli": {
+      "description": "Claude Code CLI — 代码/文件任务，能读写文件+跑命令",
+      "use_when": ["扫描代码库", "代码审查", "写代码", "重构", "文件操作"],
+      "entry": "~/.local/bin/claude",
+      "print_mode": "claude -p '任务' --model sonnet --allowedTools 'Read,Edit,Bash'"
+    }
+  },
+  "routing_rules": {
+    "不需要路由（mimo-v2.5足够）": [
+      "chat",
+      "code_small",
+      "reasoning_light",
+      "memory_op",
+      "search"
+    ],
+    "需要路由（切换到更强模型）": {
+      "code_medium": "anthropic/claude-sonnet-4.6",
+      "code_large": "anthropic/claude-opus-4.7",
+      "reasoning": "anthropic/claude-opus-4.7"
+    },
+    "Hermes自动处理": [
+      "vision",
+      "image_gen"
+    ]
+  },
+  "subagent_routing": {
+    "_comment": "子agent任务路由 — 两条路同时打通",
+    "两条执行路径": {
+      "方式1_Nous_API": {
+        "适用": "纯推理/分析/汇总/翻译",
+        "模型": "claude-sonnet-4.6 / claude-opus-4.7",
+        "入口": "phoenix.executor.claude_executor",
+        "优势": "快，无需CLI"
+      },
+      "方式2_Claude_Code_CLI": {
+        "适用": "代码扫描/审查/写代码/重构/文件操作",
+        "模型": "claude-sonnet / claude-opus",
+        "入口": "~/.local/bin/claude",
+        "优势": "能读写文件+执行命令，真正的代码agent"
+      }
+    },
+    "自动路由规则": {
+      "扫描/检查/审计": "Claude Code CLI",
+      "审查/review": "Claude Code CLI",
+      "写/修改/重构代码": "Claude Code CLI",
+      "深度分析/推理": "Nous API",
+      "翻译/汇总": "Nous API",
+      "其他": "Nous API"
+    },
+    "skill": "phoenix-claude-executor + claude-code"
+  }
+}

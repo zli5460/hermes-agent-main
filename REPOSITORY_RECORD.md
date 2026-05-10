@@ -1,12 +1,18 @@
-# Phoenix V5.1.3 仓库记录
+# Phoenix V8 仓库记录
 
-项目名称：不死鸟 Phoenix V5.1.3 初心回归版
+项目名称：不死鸟 Phoenix V8 初心回归版
 
 项目定位：
 Hermes Agent 插件 + 配置层，为 Hermes 增加手动档位切换、多模型兜底、预算控制、记忆系统能力。
 
 GitHub 仓库地址：
 https://github.com/zli5460/hermes-agent-X-Phoenix-Architecture
+
+Phoenix 发行目录（克隆后）：
+`phoenix-v8-release/`
+
+Hermes 基线（本仓库 `pyproject.toml`）：
+**hermes-agent 0.13.0**（上游 NousResearch）
 
 当前主分支：
 main
@@ -27,3 +33,4 @@ git branch -vv
 备注：
 Phoenix 本身是私有交付项目，不依赖公开 GitHub 仓库地址。
 Hermes Agent 底层框架来自 NousResearch，Phoenix 是在 Hermes 之上的插件层。
+Phoenix 变更见 `phoenix-v8-release/CHANGELOG.md` 与 `phoenix-v8-release/VERSION.md`。
