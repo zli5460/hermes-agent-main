@@ -37,14 +37,66 @@ _SENTINEL = object()
 _load_failed_at = 0
 _phoenix = _SENTINEL
 
-# 确认弹窗状态
-_pending_confirm = None  # {"task": str, "tier": str, "model": str, "action": None/"confirm"/"downgrade"}
+# 确认弹窗状态（按会话隔离，避免并发会话串线）
+_pending_confirm_sessions = {}  # session_scope -> {"task": str, "tier": str, "model": str, "action": None/"confirm"/"downgrade"}
+_last_session_scope = "global"
 
 # 消息捕获（monkey-patch用）
 _last_user_message = ""
 
 # TokenLedger: 脱敏审计，不存API Key，只记录模型/档位/动作/预估成本。
 _LEDGER_PATH = PHOENIX_DIR / "data" / "token_ledger.jsonl"
+_BUDGET_DEFAULTS = {
+    "max_steps": 24,
+    "max_visual_calls": 6,
+    "max_cost_usd": 5.0,
+    "enforce_cost_limit": False,
+}
+_HIGH_RISK_TOOL_NAMES = {
+    "terminal",
+    "execute_code",
+    "run_shell_command",
+    "write_file",
+    "patch_file",
+    "remove_file",
+    "delete_file",
+    "git_commit",
+    "git_push",
+}
+
+
+def _session_scope_from_agent(agent) -> str:
+    sid = str(getattr(agent, "session_id", "") or "").strip()
+    return f"session:{sid}" if sid else f"agent:{id(agent)}"
+
+
+def _session_scope_from_event(event) -> str:
+    try:
+        src = getattr(event, "source", None)
+        if src:
+            platform = getattr(getattr(src, "platform", None), "value", "") or ""
+            chat_id = str(getattr(src, "chat_id", "") or "")
+            thread_id = str(getattr(src, "thread_id", "") or "")
+            if platform and chat_id:
+                return f"gateway:{platform}:{chat_id}:{thread_id}"
+    except Exception:
+        pass
+    return "global"
+
+
+def _get_pending_confirm(scope: str):
+    return _pending_confirm_sessions.get(scope)
+
+
+def _set_pending_confirm(scope: str, payload):
+    if payload is None:
+        _pending_confirm_sessions.pop(scope, None)
+    else:
+        _pending_confirm_sessions[scope] = payload
+
+
+def _clear_all_pending_confirms():
+    _pending_confirm_sessions.clear()
 
 def _ledger_record(event, **fields):
     """写入 TokenLedger JSONL；失败不影响主流程。"""
@@ -60,6 +112,120 @@ def _ledger_record(event, **fields):
             f.write(json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n")
     except Exception as exc:
         logger.debug("[phoenix_full] ledger write failed: %s", exc)
+
+
+def _load_budget_guard():
+    """Create a per-run BudgetGuard from phoenix config (best effort)."""
+    try:
+        from security.budget_guard import BudgetGuard  # type: ignore
+    except Exception as exc:
+        logger.warning("[phoenix_full] BudgetGuard unavailable, skip guard: %s", exc)
+        return None
+
+    cfg = dict(_BUDGET_DEFAULTS)
+    try:
+        data = _load_phoenix_config()
+        section = data.get("budget_guard", {})
+        if isinstance(section, dict):
+            cfg.update(
+                {
+                    "max_steps": int(section.get("max_steps", cfg["max_steps"])),
+                    "max_visual_calls": int(section.get("max_visual_calls", cfg["max_visual_calls"])),
+                    "max_cost_usd": float(section.get("max_cost_usd", cfg["max_cost_usd"])),
+                    "enforce_cost_limit": bool(section.get("enforce_cost_limit", cfg["enforce_cost_limit"])),
+                }
+            )
+    except Exception as exc:
+        logger.debug("[phoenix_full] budget config load failed, use defaults: %s", exc)
+
+    return BudgetGuard(
+        max_steps=cfg["max_steps"],
+        max_visual_calls=cfg["max_visual_calls"],
+        max_cost_usd=cfg["max_cost_usd"],
+        enforce_cost_limit=cfg["enforce_cost_limit"],
+    )
+
+
+def _run_with_tier_budget_guard(agent, tier: str, task_text: str, run_fn):
+    """Gate expensive tier execution before entering the heavy run."""
+    if tier != "super_god":
+        return run_fn()
+
+    guard = _load_budget_guard()
+    if guard is None:
+        return run_fn()
+
+    try:
+        _, _, _, _, cost_max = _estimate_cost(task_text or "", tier)
+        guard.gate(visual=False, estimated_cost_usd=cost_max)
+        _ledger_record(
+            "budget_gate",
+            tier=tier,
+            ok=True,
+            estimated_cost_max=round(cost_max, 6),
+            snapshot=guard.snapshot(),
+        )
+    except Exception as exc:
+        reason = str(exc)
+        _ledger_record("budget_gate", tier=tier, ok=False, error=reason[:200])
+        return {
+            "final_response": (
+                "❌ 真神模式预算闸门已触发，已阻止本次高成本执行。\n"
+                f"原因：{reason}\n"
+                "可回复「降级」改用默认模型继续，或调整 phoenix 的 budget_guard 配置后重试。"
+            ),
+            "messages": [],
+        }
+
+    result = run_fn()
+    try:
+        _ledger_record("budget_gate_post", tier=tier, snapshot=guard.snapshot())
+    except Exception:
+        pass
+    return result
+
+
+def _run_tier_execution_with_ledger(agent, tier: str, task_text: str, run_fn):
+    """Record start/end/error lifecycle for expensive tier execution."""
+    if tier != "super_god":
+        return run_fn()
+
+    started_at = time.time()
+    _ledger_record(
+        "tier_execution_start",
+        tier=tier,
+        task_preview=(task_text or "")[:200],
+        model=getattr(agent, "model", ""),
+        provider=getattr(agent, "provider", ""),
+    )
+
+    try:
+        result = _run_with_tier_budget_guard(agent, tier, task_text, run_fn)
+        latency_ms = int((time.time() - started_at) * 1000)
+        status = "ok"
+        if isinstance(result, dict):
+            final_text = str(result.get("final_response", ""))
+            if final_text.startswith("❌"):
+                status = "blocked_or_error"
+            _ledger_record(
+                "tier_execution_end",
+                tier=tier,
+                status=status,
+                latency_ms=latency_ms,
+                final_response_preview=final_text[:240],
+            )
+        else:
+            _ledger_record("tier_execution_end", tier=tier, status=status, latency_ms=latency_ms)
+        return result
+    except Exception as exc:
+        _ledger_record(
+            "tier_execution_end",
+            tier=tier,
+            status="exception",
+            latency_ms=int((time.time() - started_at) * 1000),
+            error=str(exc)[:240],
+        )
+        raise
 
 
 # 确认弹窗配置
@@ -372,7 +538,9 @@ def _install_unified_intercept():
         _original_run_conversation = AIAgent.run_conversation
 
         def _wrapped_run_conversation(self, user_message, *args, **kwargs):
-            global _pending_confirm, _last_user_message
+            global _last_user_message, _last_session_scope
+            session_scope = _session_scope_from_agent(self)
+            _last_session_scope = session_scope
 
             # 提取纯文本（过滤掉Hermes注入的图片描述，只保留用户真实输入）
             text = ""
@@ -418,12 +586,14 @@ def _install_unified_intercept():
             if not text:
                 return _original_run_conversation(self, user_message, *args, **kwargs)
 
+            pending = _get_pending_confirm(session_scope)
+
             # ─── Step 1A: Gateway rewrite 已确认/降级的任务 ───
-            if _pending_confirm and _pending_confirm.get("action") in ("confirm", "downgrade"):
-                action = _pending_confirm.get("action")
-                original_task = _pending_confirm.get("task", text)
-                tier = _pending_confirm.get("tier")
-                target_model = _pending_confirm.get("model")
+            if pending and pending.get("action") in ("confirm", "downgrade"):
+                action = pending.get("action")
+                original_task = pending.get("task", text)
+                tier = pending.get("tier")
+                target_model = pending.get("model")
                 old_model = getattr(self, "model", "")
                 old_provider = getattr(self, "provider", "")
                 if action == "confirm" and target_model:
@@ -432,9 +602,14 @@ def _install_unified_intercept():
                         self._phoenix_default_provider = old_provider
                     switched = _do_model_switch(self, target_model, tier)
                     if not switched:
-                        _pending_confirm = None
+                        _set_pending_confirm(session_scope, None)
                         return {"final_response": f"❌ 模型切换失败，已取消执行：{target_model}", "messages": []}
-                result = _original_run_conversation(self, original_task, *args, **kwargs)
+                result = _run_tier_execution_with_ledger(
+                    self,
+                    tier,
+                    original_task,
+                    lambda: _original_run_conversation(self, original_task, *args, **kwargs),
+                )
                 if action == "confirm":
                     try:
                         default_model = getattr(self, "_phoenix_default_model", old_model)
@@ -443,16 +618,17 @@ def _install_unified_intercept():
                             logger.info("[phoenix_full] switched back to default: %s", default_model)
                     except Exception as exc:
                         _ = exc
-                _pending_confirm = None
+                _set_pending_confirm(session_scope, None)
                 return result
 
             # ─── Step 1: 检查是否有待确认的回复 ───
-            if _pending_confirm and _pending_confirm.get("action") is None:
+            if pending and pending.get("action") is None:
                 if text in ["确认", "confirm", "确定", "ok", "OK"]:
-                    original_task = _pending_confirm["task"]
-                    tier = _pending_confirm["tier"]
-                    target_model = _pending_confirm["model"]
-                    _pending_confirm["action"] = "confirm"
+                    original_task = pending["task"]
+                    tier = pending["tier"]
+                    target_model = pending["model"]
+                    pending["action"] = "confirm"
+                    _set_pending_confirm(session_scope, pending)
                     
                     # ★ 调用switch_model做完整切换（不只改model名，还重建client）
                     old_model = getattr(self, "model", "")
@@ -463,11 +639,17 @@ def _install_unified_intercept():
                         logger.info("[phoenix_full] user confirmed %s, model switched: %s → %s",
                                     tier, old_model, getattr(self, "model", "?"))
                     else:
-                        _pending_confirm = None
+                        _ledger_record("tier_execution_switch_failed", tier=tier, model=target_model, reason="switch_model_failed")
+                        _set_pending_confirm(session_scope, None)
                         logger.warning("[phoenix_full] switch_model failed, cancel expensive task")
                         return {"final_response": f"❌ 模型切换失败，已取消执行：{target_model}", "messages": []}
                     
-                    result = _original_run_conversation(self, original_task, *args, **kwargs)
+                    result = _run_tier_execution_with_ledger(
+                        self,
+                        tier,
+                        original_task,
+                        lambda: _original_run_conversation(self, original_task, *args, **kwargs),
+                    )
                     
                     # ★ 任务完成，切回默认模型
                     try:
@@ -479,26 +661,29 @@ def _install_unified_intercept():
                     except Exception as exc:
                         _ = exc
                     
-                    _pending_confirm = None
+                    _set_pending_confirm(session_scope, None)
                     return result
 
                 elif text in ["降级", "downgrade", "降低", "低配"]:
-                    original_task = _pending_confirm["task"]
-                    _pending_confirm["action"] = "downgrade"
+                    original_task = pending["task"]
+                    _ledger_record("tier_execution_downgraded", tier=pending.get("tier"), task_preview=original_task[:200])
+                    pending["action"] = "downgrade"
+                    _set_pending_confirm(session_scope, pending)
                     logger.info("[phoenix_full] user downgraded, using default model")
                     result = _original_run_conversation(self, original_task, *args, **kwargs)
-                    _pending_confirm = None
+                    _set_pending_confirm(session_scope, None)
                     return result
 
                 elif text in ["取消", "cancel", "算了", "不要"]:
-                    _pending_confirm = None
+                    _ledger_record("tier_execution_cancelled", tier=pending.get("tier"), task_preview=pending.get("task", "")[:200])
+                    _set_pending_confirm(session_scope, None)
                     logger.info("[phoenix_full] user cancelled")
                     return {"final_response": "✓ 已取消", "messages": []}
 
             # ─── Step 2: 检测高成本任务 → 弹确认框 ───
             # 如果 _pending_confirm 已有 action，说明是 Gateway rewrite，
             # 不要覆盖，直接放行到原始 run_conversation
-            if _pending_confirm and _pending_confirm.get("action") is not None:
+            if pending and pending.get("action") is not None:
                 return _original_run_conversation(self, user_message, *args, **kwargs)
 
             tier, tier_cfg = _detect_high_tier(text)
@@ -509,14 +694,14 @@ def _install_unified_intercept():
                     self._phoenix_default_provider = getattr(self, "provider", "")
                 
                 target_model, target_provider = _resolve_tier_primary(tier, tier_cfg.get("model"))
-                _pending_confirm = {
+                _set_pending_confirm(session_scope, {
                     "task": text,
                     "tier": tier,
                     "model": target_model,
                     "provider": target_provider,
                     "route_chain": _tier_binding_chain(tier),
                     "action": None,
-                }
+                })
                 confirm_box = _make_confirm_box(tier, text)
                 logger.info("[phoenix_full] confirm dialog shown for %s: %s",
                             tier, text[:50])
@@ -609,6 +794,7 @@ def register(manager):
     )
 
     manager.register_hook("pre_gateway_dispatch", _on_pre_gateway_dispatch)
+    manager.register_hook("pre_tool_call", _on_pre_tool_call)
     manager.register_hook("pre_api_request", _on_pre_api_request)
     manager.register_hook("post_api_request", _on_post_api_request)
     manager.register_hook("on_session_start", _on_session_start)
@@ -628,30 +814,35 @@ def _on_pre_gateway_dispatch(**kwargs):
     仅处理确认回复（用户输入"确认/降级/取消"时rewrite为原始任务）。
     新高成本任务的确认框由 run_conversation 的 monkey-patch 统一处理。
     """
-    global _pending_confirm
+    global _last_session_scope
 
     event = kwargs.get("event")
     if not event or not hasattr(event, "text"):
         return None
 
+    session_scope = _session_scope_from_event(event)
+    _last_session_scope = session_scope
+    pending = _get_pending_confirm(session_scope)
     text = event.text.strip()
 
     # 有待确认 → 处理用户回复
-    if _pending_confirm and _pending_confirm.get("action") is None:
+    if pending and pending.get("action") is None:
         if text in ["确认", "confirm", "确定", "ok", "OK"]:
-            original_task = _pending_confirm["task"]
-            _pending_confirm["action"] = "confirm"
+            original_task = pending["task"]
+            pending["action"] = "confirm"
+            _set_pending_confirm(session_scope, pending)
             logger.info("[phoenix_full] gateway confirmed: %s", original_task[:50])
             return {"action": "rewrite", "text": original_task}
 
         elif text in ["降级", "downgrade", "降低", "低配"]:
-            original_task = _pending_confirm["task"]
-            _pending_confirm["action"] = "downgrade"
+            original_task = pending["task"]
+            pending["action"] = "downgrade"
+            _set_pending_confirm(session_scope, pending)
             logger.info("[phoenix_full] gateway downgraded")
             return {"action": "rewrite", "text": original_task}
 
         elif text in ["取消", "cancel", "算了", "不要"]:
-            _pending_confirm = None
+            _set_pending_confirm(session_scope, None)
             logger.info("[phoenix_full] gateway cancelled")
             return {"action": "rewrite", "text": "✓ 已取消"}
 
@@ -664,6 +855,44 @@ def _on_pre_gateway_dispatch(**kwargs):
 # ============================================================
 # Provider解析：正确的模型切换（调switch_model而非只改model名）
 # ============================================================
+
+def _is_high_risk_tool_name(tool_name: str) -> bool:
+    name = (tool_name or "").strip().lower()
+    if not name:
+        return False
+    if name in _HIGH_RISK_TOOL_NAMES:
+        return True
+    risky_prefixes = ("git_", "terminal_", "file_patch", "file_write", "delete_", "remove_")
+    return any(name.startswith(prefix) for prefix in risky_prefixes)
+
+
+def _on_pre_tool_call(**kwargs):
+    """Hard gate: during /真神 confirm-run, risky tools require explicit confirmation."""
+    pc = _get_pending_confirm(_last_session_scope) or {}
+    if pc.get("tier") != "super_god" or pc.get("action") != "confirm":
+        return None
+
+    tool_name = kwargs.get("tool_name", "")
+    if not _is_high_risk_tool_name(tool_name):
+        return None
+
+    args = kwargs.get("args") or {}
+    confirmed = isinstance(args, dict) and bool(args.get("user_confirmed_high_risk"))
+    if confirmed:
+        return None
+
+    block_msg = (
+        "Phoenix 真神模式已拦截高风险工具调用："
+        f"`{tool_name}` 需要显式参数 `user_confirmed_high_risk=true`。"
+    )
+    _ledger_record(
+        "high_risk_tool_blocked",
+        tier="super_god",
+        tool=tool_name,
+        reason="missing_user_confirmed_high_risk",
+    )
+    return {"action": "block", "message": block_msg}
+
 
 def _classify_route(user_message):
     """V8: 自动升档已关闭。保留函数只为旧调用兼容，固定返回 daily。"""
@@ -842,21 +1071,21 @@ def _on_pre_api_request(**kwargs):
     通过 _last_user_message（monkey-patch捕获）获取用户消息，
     使用 RouterEngine 做分类和模型选择。
     """
-    global _pending_confirm
+    pending = _get_pending_confirm(_last_session_scope)
 
     # 优先处理pending确认（Gateway rewrite后的模型切换）
-    if _pending_confirm:
-        action = _pending_confirm.get("action")
+    if pending:
+        action = pending.get("action")
         if action == "confirm":
-            model = _pending_confirm["model"]
-            tier = _pending_confirm["tier"]
+            model = pending["model"]
+            tier = pending["tier"]
             logger.warning(
                 "[phoenix_full] BLOCKED fake hook switch for %s (%s): switch_model must happen in run_conversation",
                 model, tier
             )
             return None
         elif action == "downgrade":
-            _pending_confirm = None
+            _set_pending_confirm(_last_session_scope, None)
             logger.info("[phoenix_full] using default model (downgraded)")
             return None
 
@@ -915,8 +1144,13 @@ def _on_session_finalize(**kwargs):
 
 
 def _on_session_reset(**kwargs):
-    global _pending_confirm, _last_user_message
-    _pending_confirm = None
+    global _last_user_message, _last_session_scope
+    session_id = str(kwargs.get("session_id") or "").strip()
+    if session_id:
+        _set_pending_confirm(f"session:{session_id}", None)
+    else:
+        _clear_all_pending_confirms()
+    _last_session_scope = "global"
     _last_user_message = ""
 
     try:
