@@ -40,6 +40,7 @@ _phoenix = _SENTINEL
 # 确认弹窗状态（按会话隔离，避免并发会话串线）
 _pending_confirm_sessions = {}  # session_scope -> {"task": str, "tier": str, "model": str, "action": None/"confirm"/"downgrade"}
 _last_session_scope = "global"
+_task_scope_map = {}  # task_id -> session_scope
 
 # 消息捕获（monkey-patch用）
 _last_user_message = ""
@@ -97,6 +98,23 @@ def _set_pending_confirm(scope: str, payload):
 
 def _clear_all_pending_confirms():
     _pending_confirm_sessions.clear()
+
+
+def _bind_task_scope(task_id: str, scope: str) -> None:
+    tid = str(task_id or "").strip()
+    if not tid:
+        return
+    _task_scope_map[tid] = scope
+
+
+def _scope_from_hook_kwargs(kwargs) -> str:
+    task_id = str(kwargs.get("task_id") or "").strip()
+    if task_id and task_id in _task_scope_map:
+        return _task_scope_map[task_id]
+    session_id = str(kwargs.get("session_id") or "").strip()
+    if session_id:
+        return f"session:{session_id}"
+    return _last_session_scope
 
 def _ledger_record(event, **fields):
     """写入 TokenLedger JSONL；失败不影响主流程。"""
@@ -868,7 +886,8 @@ def _is_high_risk_tool_name(tool_name: str) -> bool:
 
 def _on_pre_tool_call(**kwargs):
     """Hard gate: during /真神 confirm-run, risky tools require explicit confirmation."""
-    pc = _get_pending_confirm(_last_session_scope) or {}
+    scope = _scope_from_hook_kwargs(kwargs)
+    pc = _get_pending_confirm(scope) or {}
     if pc.get("tier") != "super_god" or pc.get("action") != "confirm":
         return None
 
@@ -1071,7 +1090,11 @@ def _on_pre_api_request(**kwargs):
     通过 _last_user_message（monkey-patch捕获）获取用户消息，
     使用 RouterEngine 做分类和模型选择。
     """
-    pending = _get_pending_confirm(_last_session_scope)
+    scope = _scope_from_hook_kwargs(kwargs)
+    task_id = str(kwargs.get("task_id") or "").strip()
+    if task_id:
+        _bind_task_scope(task_id, scope)
+    pending = _get_pending_confirm(scope)
 
     # 优先处理pending确认（Gateway rewrite后的模型切换）
     if pending:
@@ -1085,7 +1108,7 @@ def _on_pre_api_request(**kwargs):
             )
             return None
         elif action == "downgrade":
-            _set_pending_confirm(_last_session_scope, None)
+            _set_pending_confirm(scope, None)
             logger.info("[phoenix_full] using default model (downgraded)")
             return None
 
@@ -1147,9 +1170,14 @@ def _on_session_reset(**kwargs):
     global _last_user_message, _last_session_scope
     session_id = str(kwargs.get("session_id") or "").strip()
     if session_id:
-        _set_pending_confirm(f"session:{session_id}", None)
+        scope = f"session:{session_id}"
+        _set_pending_confirm(scope, None)
+        stale_task_ids = [tid for tid, bound in _task_scope_map.items() if bound == scope]
+        for tid in stale_task_ids:
+            _task_scope_map.pop(tid, None)
     else:
         _clear_all_pending_confirms()
+        _task_scope_map.clear()
     _last_session_scope = "global"
     _last_user_message = ""
 

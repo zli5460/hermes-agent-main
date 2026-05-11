@@ -43,17 +43,20 @@ def test_pre_tool_call_blocks_high_risk_in_super_god_confirm():
     from plugins import phoenix_full as mod
 
     mod._clear_all_pending_confirms()
+    mod._task_scope_map.clear()
     mod._set_pending_confirm("session:test", {"tier": "super_god", "action": "confirm", "task": "/真神 任务"})
-    mod._last_session_scope = "session:test"
+    mod._bind_task_scope("task-1", "session:test")
 
-    blocked = mod._on_pre_tool_call(tool_name="terminal", args={})
+    blocked = mod._on_pre_tool_call(tool_name="terminal", args={}, task_id="task-1")
     assert isinstance(blocked, dict)
     assert blocked.get("action") == "block"
 
     allowed = mod._on_pre_tool_call(
         tool_name="terminal",
         args={"user_confirmed_high_risk": True},
+        task_id="task-1",
     )
     assert allowed is None
 
     mod._clear_all_pending_confirms()
+    mod._task_scope_map.clear()

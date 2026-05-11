@@ -4,7 +4,16 @@
 让AI系统像不死鸟一样，死不了、砍不掉、自己会修自己、越用越牛逼。
 """
 
-from phoenix.phoenix import Phoenix  # noqa: F401
+try:
+    # Prefer package-relative import when this repo layout is imported directly.
+    from .phoenix import Phoenix  # type: ignore[attr-defined]  # noqa: F401
+except Exception:
+    try:
+        # Fallback for runtime environments that expose ``phoenix`` as a top-level package.
+        from phoenix.phoenix import Phoenix  # type: ignore  # noqa: F401
+    except Exception:
+        # Allow package import for tests/tooling even when runtime Phoenix module is absent.
+        Phoenix = None  # type: ignore
 import threading
 import atexit
 import sys
